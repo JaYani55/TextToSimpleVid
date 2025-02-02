@@ -16,11 +16,11 @@ Text-to-Video System v1.0 converts Markdown files into dynamic video content. It
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your_username/text-to-video.git
+   git clone https://github.com/JaYani55/TextToSimpleVid.git
    ```
 2. **Install dependencies:**
    ```bash
-   cd text-to-video
+   cd TextToSimpleVid
    pip install -r requirements.txt
    ```
 3. **Configure settings:**  
