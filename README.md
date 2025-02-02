@@ -2,43 +2,43 @@
 
 ## Overview
 
-Text-to-Video System v1.0 is a modular pipeline that transforms Markdown files into engaging video content. It uses natural-sounding text-to-speech (TTS) via the ElevenLabs API to generate narration, overlaid on a dynamic audio visualizer. Special markers in your Markdown allow you to insert images, video clips, and background audio—each with customizable effects like edge extraction or rotoscoping. The original text is also rendered as synchronized subtitles, ensuring a cohesive multimedia experience.
+Text-to-Video System v1.0 converts Markdown files into dynamic video content. It generates natural-sounding narration using the ElevenLabs API, visualized through an audio-reactive visualizer. Users can embed images, videos, and background audio through special Markdown markers, applying configurable effects such as edge detection or rotoscoping. The original text is also displayed as synchronized subtitles.
 
 ## Features
 
-- **TTS Conversion**: Converts text to speech using the ElevenLabs API.
-- **Audio Visualizer**: Generates dynamic visualizations based on the narration.
-- **Media Insertions**: Supports embedding images and videos with configurable effects and display durations.
-- **Subtitles**: Automatically syncs and overlays the original text as subtitles.
-- **Modularity**: Designed with a modular structure for easy swapping or extension of components (e.g., TTS provider).
-
-## Project Structure
-
-text-to-video/ ├── config/ # Global configuration files (effects, TTS settings, etc.) ├── input/ # Sample Markdown files ├── output/ # Generated video files and intermediate assets ├── src/ │ ├── main.py # Main orchestrator script │ ├── parser/ # Markdown parser and marker extraction module │ ├── tts/ # TTS module (ElevenLabs API wrapper) │ ├── visualizer/ # Audio visualizer generation module │ ├── media/ # Image/video processing and effect modules │ ├── subtitles/ # Subtitle rendering module │ └── audio/ # Audio mixing module ├── tests/ # Unit tests for individual modules └── requirements.txt # Python dependencies
-
-bash
-Kopieren
+- **Text-to-Speech (TTS)**: Converts text into high-quality speech.
+- **Audio Visualizer**: Dynamically reacts to generated speech.
+- **Media Integration**: Supports images, videos, and background audio with configurable effects.
+- **Subtitles**: Automatically syncs the original text to the narration.
+- **Extensible & Modular**: Easily swap or extend components such as TTS providers and visual effects.
 
 ## Installation
 
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/your_username/text-to-video.git
-Install dependencies:
-bash
-Kopieren
-cd text-to-video
-pip install -r requirements.txt
-Configure settings:
-Update the configuration files in the config/ directory (e.g., set your ElevenLabs API key).
-Usage
-Run the main script to convert a Markdown file into a video:
+   ```
+2. **Install dependencies:**
+   ```bash
+   cd text-to-video
+   pip install -r requirements.txt
+   ```
+3. **Configure settings:**  
+   Edit the configuration files in the `config/` directory (e.g., set API keys and effect parameters).
 
-bash
-Kopieren
+## Usage
+
+Run the main script to generate a video from a Markdown file:
+```bash
 python src/main.py --input input/sample.md --output output/final_video.mp4
-Note: Your Markdown files can include special markers to insert media. For example:
+```
 
-[[imagepath: path/to/image.svg, duration: 5, effect: edge]]
-[[videopath: path/to/video.mp4, transition: fade]]
-[[audio: path/to/background.mp3, volume: 0.8]]
+### Markdown Formatting for Media
+
+- **Images:** `[[imagepath: path/to/image.svg, duration: 5, effect: edge]]`
+- **Videos:** `[[videopath: path/to/video.mp4, transition: fade]]`
+- **Audio:** `[[audio: path/to/background.mp3, volume: 0.8]]`
+
+## Contributing
+
+Contributions are welcome! Please fork the repository and submit a pull request.
