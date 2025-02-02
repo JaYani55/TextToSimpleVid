@@ -1,0 +1,8 @@
+
+elevenlabs:
+  api_key: "YOUR_API_KEY_HERE"
+  default_voice: "Adam"
+  
+output:
+  format: "mp3"
+  sample_rate: 44100

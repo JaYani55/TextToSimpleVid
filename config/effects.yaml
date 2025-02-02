@@ -1,0 +1,13 @@
+effects:
+  fade:
+    default_duration: 1.0
+    types:
+      - fade_in
+      - fade_out
+  
+  transition:
+    default_duration: 0.5
+    types:
+      - dissolve
+      - wipe
+      - slide

@@ -1,0 +1,8 @@
+.venv/
+input/*
+output/*
+!input/.gitkeep
+!output/.gitkeep
+*.pyc
+__pycache__/
+*.log
