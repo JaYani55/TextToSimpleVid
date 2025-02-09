@@ -18,3 +18,11 @@ class FontManager:
                 
         # Fallback to a basic font name that should work on most systems
         return "Arial"
+
+    @staticmethod
+    def validate_font(font_path):
+        """Validate that the font file exists and return its resolved path."""
+        path = Path(font_path).resolve()
+        if not path.exists():
+            raise ValueError(f"Required font file not found: {font_path}")
+        return str(path)

@@ -6,3 +6,5 @@ output/*
 *.pyc
 __pycache__/
 *.log
+.onnx
+.bin
