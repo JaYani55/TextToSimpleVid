@@ -9,3 +9,7 @@ Basic videofile generation [X]
 ~~[] Turn Audio file to video with subtitles (No subtitles)~~ [X] But SRT file is being generated so come back later.
 [] Implement Audio Visualizer
 [] Implement Media imports and effects from reading text.
+
+1. Generate Audio from script and create video, then calculate video length, output in console
+2. Put in media into text with timestamps
+3. 

@@ -6,11 +6,12 @@ import sys
 import soundfile as sf
 from kokoro_onnx import Kokoro
 
-def generate_speech(text, output_file="tts_audio.mp3", voice="af_sarah", speed=1.0, lang="en-us"):
+def generate_speech(text, output_file="tts_audio.mp3", voice="af_heart", speed=1.0, lang="en-us"):
     # Set up paths and initialize Kokoro
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(script_dir, "kokoro-v1.0.onnx")
-    voices_path = os.path.join(script_dir, "voices-v1.0.bin")
+    models_dir = os.path.join(script_dir, "models")  # Go up one level and into models
+    model_path = os.path.join(models_dir, "kokoro-v1.0.onnx")
+    voices_path = os.path.join(models_dir, "voices-v1.0.bin")
     kokoro = Kokoro(model_path, voices_path)
 
     result = {}

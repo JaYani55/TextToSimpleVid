@@ -46,7 +46,7 @@ done_event = threading.Event()
 
 def run_tts():
     samples, sample_rate = kokoro.create(
-        example_text, voice="af_sarah", speed=1.0, lang="en-us"
+        example_text, voice="af_heart", speed=1.0, lang="en-us"
     )
     result["samples"] = samples
     result["sample_rate"] = sample_rate
