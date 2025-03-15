@@ -3,12 +3,12 @@
 Basic videofile generation [X]
 
 [X] Kokoro.tts local output tts
-    [] Elevenlabs TTS API
-    [] Voice sample etc. from configfile
-    [] Kokoro models to model folder
+    [X] Kokoro TTS local
+    [X] Voice sample etc. from configfile
+    [X] Kokoro models to model folder
 ~~[] Turn Audio file to video with subtitles (No subtitles)~~ [X] But SRT file is being generated so come back later.
-[] Implement Audio Visualizer
-[] Implement Media imports and effects from reading text.
+[X] Implement Audio Visualizer
+[X] Implement Media imports and effects from reading text.
 
 1. Generate Audio from script and create video, then calculate video length, output in console
 2. Put in media into text with timestamps
