@@ -8,3 +8,4 @@ __pycache__/
 *.log
 .onnx
 src/tts/models/
+audio.wav
