@@ -27,7 +27,7 @@ MAX_DURATION_SECONDS = 30  # Maximum allowed duration
 MAX_SAMPLES = 1323000  # Maximum number of samples allowed (44100 * 30)
 
 # TTS settings
-DEFAULT_VOICE = "af_heart"
+DEFAULT_VOICE = "af_nicole"
 DEFAULT_SPEED = 1.0
 DEFAULT_LANGUAGE = "en-us"
 
