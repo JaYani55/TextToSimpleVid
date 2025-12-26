@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="Simple Text-to-Video converter")
     parser.add_argument('--md', type=str, default='input/sample.md', help='Path to markdown file')
     parser.add_argument('--output', type=str, default='output', help='Output folder path')
+    parser.add_argument('--audio-only', action='store_true', help='Generate only audio file')
     args = parser.parse_args()
 
     # Validate input file and ensure the output directory exists.
@@ -42,6 +43,10 @@ def main():
     print("Generating TTS audio...")
     audio_file, audio_duration = generate_speech(plain_text, output_file=tts_audio_path)
     print(f"Audio generated: {audio_file} (Duration: {audio_duration:.2f}s)")
+
+    if args.audio_only:
+        print("Audio-only mode selected. Skipping video generation.")
+        return
 
     # 3. Create video from markers
     print("Creating video...")
