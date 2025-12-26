@@ -8,10 +8,8 @@ import soundfile as sf
 import numpy as np
 from kokoro_onnx import Kokoro
 
-def split_text_smart(text, max_length=200):
+def split_text_smart(text, max_length=150):
     # Split by sentence endings (.!?) or newlines
-    # The regex keeps the delimiters if possible, or we can just split and rejoin.
-    # Here we split by delimiters that usually end a thought.
     sentences = re.split(r'(?<=[.!?])\s+|\n+', text)
     chunks = []
     current_chunk = ""
@@ -21,35 +19,46 @@ def split_text_smart(text, max_length=200):
         if not sentence:
             continue
             
-        # If a single sentence is too long, split it further by commas or spaces
-        if len(sentence) > max_length:
-            sub_parts = re.split(r'[,;]\s+', sentence)
-            for part in sub_parts:
-                if len(current_chunk) + len(part) + 1 < max_length:
-                    current_chunk += part + ", "
-                else:
-                    if current_chunk:
-                        chunks.append(current_chunk.strip(", "))
-                    current_chunk = part + ", "
-                    # If still too long, just hard split (unlikely with 200 chars but possible)
-                    if len(current_chunk) > max_length:
-                         chunks.append(current_chunk.strip(", "))
-                         current_chunk = ""
-            continue
-
-        if len(current_chunk) + len(sentence) + 1 < max_length:
-            current_chunk += sentence + ". "
-        else:
+        # If adding this sentence exceeds max_length
+        if len(current_chunk) + len(sentence) + 1 > max_length:
             if current_chunk:
                 chunks.append(current_chunk.strip())
-            current_chunk = sentence + ". "
+                current_chunk = ""
+            
+            # If the sentence itself is longer than max_length, we need to split it further
+            if len(sentence) > max_length:
+                # Split by comma or semicolon
+                sub_parts = re.split(r'[,;]\s+', sentence)
+                for part in sub_parts:
+                    part = part.strip()
+                    if not part: continue
+                    
+                    if len(current_chunk) + len(part) + 1 > max_length:
+                        if current_chunk:
+                            chunks.append(current_chunk.strip())
+                            current_chunk = ""
+                        
+                        # If part is still too long, split by space
+                        if len(part) > max_length:
+                            words = part.split(' ')
+                            for word in words:
+                                if len(current_chunk) + len(word) + 1 > max_length:
+                                    if current_chunk:
+                                        chunks.append(current_chunk.strip())
+                                    current_chunk = word
+                                else:
+                                    current_chunk = (current_chunk + " " + word).strip()
+                        else:
+                            current_chunk = part
+                    else:
+                        current_chunk = (current_chunk + ", " + part).strip()
+            else:
+                current_chunk = sentence
+        else:
+            current_chunk = (current_chunk + " " + sentence).strip()
             
     if current_chunk:
         chunks.append(current_chunk.strip())
-    
-    # Fallback if no chunks (empty text)
-    if not chunks and text:
-        chunks = [text]
         
     return chunks
 
