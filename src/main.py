@@ -137,12 +137,22 @@ def main():
     # 6. Write the final video file
     output_video_path = os.path.join(args.output, "output_video.mp4")
     print("Exporting final video...")
+    
+    # Get number of CPU threads for parallel encoding
+    import multiprocessing
+    num_threads = max(4, multiprocessing.cpu_count())
+    
     final_clip.write_videofile(
         output_video_path,
         fps=24,
         codec="libx264",
         audio_codec="aac",
-        ffmpeg_params=["-pix_fmt", "yuv420p"],
+        threads=num_threads,           # Use multi-threading for encoding
+        preset="ultrafast",            # Fast encoding (slightly larger file)
+        ffmpeg_params=[
+            "-pix_fmt", "yuv420p",
+            "-crf", "23",              # Good quality/speed balance
+        ],
         temp_audiofile="temp-audio.m4a",
         remove_temp=True
     )

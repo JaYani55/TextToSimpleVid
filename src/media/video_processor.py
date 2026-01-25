@@ -5,14 +5,17 @@ from moviepy import (
     VideoFileClip,
     AudioFileClip,
     ImageSequenceClip,
-    concatenate_videoclips,
-    CompositeAudioClip
+    CompositeAudioClip,
+    concatenate_audioclips
 )
-from moviepy.video.fx import CrossFadeIn, CrossFadeOut
+from moviepy.video.fx import CrossFadeIn, CrossFadeOut, Loop
 import os
 import imageio
 from PIL import Image
 from typing import Dict, List, Any, Optional, Tuple
+
+# Global FPS for consistent rendering
+GLOBAL_FPS = 24
 
 class VideoProcessor:
     """
@@ -32,7 +35,7 @@ class VideoProcessor:
         
     def _loop_clip(self, clip, target_duration: float):
         """
-        Loop a clip to fill the target duration.
+        Loop a clip to fill the target duration using efficient loop fx.
         
         Args:
             clip: The MoviePy clip to loop
@@ -46,16 +49,10 @@ class VideoProcessor:
             
         if clip.duration >= target_duration:
             return clip.subclipped(0, target_duration)
-            
-        # Calculate number of loops needed
-        num_loops = int(target_duration / clip.duration) + 1
         
-        # Create looped clip by concatenating
-        clips = [clip] * num_loops
-        looped = concatenate_videoclips(clips)
-        
-        # Trim to exact duration
-        return looped.subclipped(0, target_duration)
+        # Use the efficient Loop fx instead of concatenating clips
+        # This handles looping at the reader level, much faster
+        return clip.with_effects([Loop(duration=target_duration)])
         
     def _loop_audio_clip(self, clip, target_duration: float):
         """
@@ -73,17 +70,12 @@ class VideoProcessor:
             
         if clip.duration >= target_duration:
             return clip.subclipped(0, target_duration)
-            
-        from moviepy import concatenate_audioclips
         
-        # Calculate number of loops needed
+        # For audio, we still need concatenation but minimize copies
         num_loops = int(target_duration / clip.duration) + 1
-        
-        # Create looped clip by concatenating
         clips = [clip] * num_loops
         looped = concatenate_audioclips(clips)
         
-        # Trim to exact duration
         return looped.subclipped(0, target_duration)
         
     def create_clip_from_marker(self, marker: Dict[str, Any], total_duration: float) -> Optional[Any]:
@@ -180,7 +172,7 @@ class VideoProcessor:
     
     def _create_animated_gif_clip(self, gif_path: str, duration: float, target_width: int):
         """
-        Create an animated clip from a GIF using imageio, ensuring animation plays for full duration.
+        Create an animated clip from a GIF efficiently.
         
         Args:
             gif_path: Path to the GIF file
@@ -188,44 +180,53 @@ class VideoProcessor:
             target_width: Target width for resizing
             
         Returns:
-            An ImageSequenceClip that loops to fill the duration
+            A clip that loops to fill the duration
         """
         try:
-            fixed_fps = 20
+            # Try using VideoFileClip first - more memory efficient for long durations
+            # VideoFileClip can handle GIFs and streams frames on demand
+            clip = VideoFileClip(gif_path)
             
-            # Read all frames from the GIF
-            frames = imageio.mimread(gif_path)
-            if not frames:
-                raise ValueError("No frames extracted from GIF.")
+            # Loop if needed using efficient fx
+            if clip.duration < duration:
+                clip = clip.with_effects([Loop(duration=duration)])
+            else:
+                clip = clip.subclipped(0, duration)
             
-            # Convert frames to RGB if they have an alpha channel
-            processed_frames = []
-            for frame in frames:
-                if frame.shape[-1] == 4:
-                    frame = frame[..., :3]
-                processed_frames.append(frame)
-            
-            # Calculate how many times we need to loop to fill the duration
-            original_duration = len(processed_frames) / fixed_fps
-            loop_count = int(duration / original_duration) + 1
-            
-            # Create extended frames
-            extended_frames = []
-            for _ in range(loop_count):
-                extended_frames.extend(processed_frames)
-            
-            # Create the final clip
-            clip = (ImageSequenceClip(extended_frames, fps=fixed_fps)
-                    .with_duration(duration)
-                    .resized(width=target_width))
-            return clip
+            # Resize once at the end
+            return clip.resized(width=target_width)
             
         except Exception as e:
-            print(f"Error processing animated GIF: {e}")
-            # Fallback to a static image clip
-            return (ImageClip(gif_path)
-                    .with_duration(duration)
-                    .resized(width=target_width))
+            # Fallback: use imageio for problematic GIFs
+            try:
+                frames = imageio.mimread(gif_path, memtest=False)  # Disable memory test for large GIFs
+                if not frames:
+                    raise ValueError("No frames extracted from GIF.")
+                
+                # Convert frames to RGB
+                processed_frames = []
+                for frame in frames:
+                    if len(frame.shape) > 2 and frame.shape[-1] == 4:
+                        frame = frame[..., :3]
+                    processed_frames.append(frame)
+                
+                # Create clip with a reasonable FPS
+                clip = ImageSequenceClip(processed_frames, fps=GLOBAL_FPS)
+                
+                # Loop efficiently
+                if clip.duration < duration:
+                    clip = clip.with_effects([Loop(duration=duration)])
+                else:
+                    clip = clip.subclipped(0, duration)
+                    
+                return clip.resized(width=target_width)
+                
+            except Exception as e2:
+                print(f"Error processing GIF {gif_path}: {e2}")
+                # Ultimate fallback: static image
+                return (ImageClip(gif_path)
+                        .with_duration(duration)
+                        .resized(width=target_width))
                     
     def create_audio_from_marker(self, marker: Dict[str, Any], total_duration: float) -> Optional[Any]:
         """
@@ -358,14 +359,7 @@ class VideoProcessor:
             
         print(f"Target video duration: {target_duration}s")
 
-        # Create base background clip
-        base_clip = ColorClip(
-            size=(self.width, self.height),
-            color=self.bg_color,
-            duration=target_duration
-        )
-        
-        # Organize video clips by channel
+        # Organize video clips by channel first to check if we need a background
         channel_clips: Dict[int, List[Any]] = {}
         
         for marker in video_markers:
@@ -375,15 +369,43 @@ class VideoProcessor:
                 if channel not in channel_clips:
                     channel_clips[channel] = []
                 channel_clips[channel].append(clip)
-                
+        
         # Build final clip list sorted by channel (lower channels first = rendered behind)
-        all_video_clips = [base_clip]
+        all_video_clips = []
+        
+        # Check if the lowest channel has a full-duration clip that covers the screen
+        # If so, we can skip the ColorClip background
+        needs_background = True
+        if channel_clips:
+            lowest_channel = min(channel_clips.keys())
+            lowest_clips = channel_clips[lowest_channel]
+            # Check if any clip in the lowest channel starts at 0 and covers full duration
+            for clip in lowest_clips:
+                if hasattr(clip, 'start') and clip.start == 0:
+                    if hasattr(clip, 'duration') and clip.duration >= target_duration:
+                        needs_background = False
+                        break
+        
+        # Only create background if needed
+        if needs_background:
+            base_clip = ColorClip(
+                size=(self.width, self.height),
+                color=self.bg_color,
+                duration=target_duration
+            )
+            all_video_clips.append(base_clip)
+        
+        # Add clips sorted by channel
         for channel in sorted(channel_clips.keys()):
             all_video_clips.extend(channel_clips[channel])
             
-        # Create composite video
+        # Create composite video with bg_color for any gaps
         print(f"Creating composite video with {len(all_video_clips)} clips across {len(channel_clips)} channels...")
-        final_clip = CompositeVideoClip(all_video_clips, size=(self.width, self.height))
+        final_clip = CompositeVideoClip(
+            all_video_clips, 
+            size=(self.width, self.height),
+            bg_color=self.bg_color  # Use bg_color parameter for efficiency
+        )
         
         # Process audio markers and mix with TTS audio
         audio_clips = []
