@@ -10,6 +10,8 @@ Basic videofile generation [X]
 [X] Implement Audio Visualizer
 [X] Implement Media imports and effects from reading text.
 
-1. Generate Audio from script and create video, then calculate video length, output in console
-2. Put in media into text with timestamps
-3. 
+[] Video / Audio Image Clip Library
+[] Loop or run clip for set duration (loop until duration over) or until the clip plays once
+[] Sound Effects and syntax import
+[] Subtitle / Text On Screen renderer. Text as Video effect with Syntax
+[] Audio / Video Channels and Overlays

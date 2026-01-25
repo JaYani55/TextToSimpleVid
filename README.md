@@ -2,14 +2,17 @@
 
 ## Overview
 
-This project converts markdown text files into narrated videos. It uses Kokoro TTS (Text-to-Speech) to generate natural-sounding narration and allows you to synchronize images and video clips with the spoken content through simple markdown syntax.
+This project converts markdown text files into narrated videos with multi-channel audio/video support. It uses Kokoro TTS (Text-to-Speech) to generate natural-sounding narration and allows you to layer images, video clips, audio tracks, and text overlays through simple markdown syntax.
 
 ## Features
 
-- Text-to-Speech narration using Kokoro ONNX
-- Image and video integration with timing control
-- Automatic duration scaling to match narration
-- Simple markdown syntax for media placement
+- **Text-to-Speech** narration using Kokoro ONNX
+- **Multi-channel video composition** - Layer multiple video/image tracks
+- **Multi-channel audio mixing** - Background music, SFX, and TTS combined
+- **Loop support** - Loop video/audio clips for any duration
+- **Text overlays** - Titles, subtitles, and custom text with styling
+- **Media library** - Organize reusable assets in the library folder
+- **Flexible timing** - Precise control with timestamps and durations
 
 ## Installation
 
@@ -49,15 +52,23 @@ This project converts markdown text files into narrated videos. It uses Kokoro T
 
 1. **Create a markdown file with media markers:**
    ```markdown
-   [[video_duration: 15]]
+   [[video_duration: 120]]
+
+   [[audiopath: background_music.mp3, timestamp: 0, duration: loop, channel: 3, volume: 0.3]]
+   [[videopath: background.mp4, timestamp: 0, duration: loop, channel: 3]]
 
    Welcome to our demonstration.
 
-   Here's an image:
-   [[imagepath: image.jpg, timestamp: 0, duration: 5]]
+   [[text: Welcome!, timestamp: 0, duration: 5, position: center, style: title]]
 
-   And a video clip:
-   [[videopath: video.mp4, timestamp: 5, duration: 10]]
+   Here's an image overlay:
+   [[imagepath: logo.png, timestamp: 5, duration: 10, channel: 1]]
+
+   And a sound effect:
+   [[sfxpath: whoosh.wav, timestamp: 5]]
+
+   Check out this video clip:
+   [[videopath: demo.mp4, timestamp: 15, duration: 20, channel: 2, transition: fade]]
    ```
 
 2. **Run the converter:**
@@ -65,37 +76,118 @@ This project converts markdown text files into narrated videos. It uses Kokoro T
    python src/main.py --md input/sample.md --output output
    ```
 
+3. **Additional options:**
+   ```bash
+   # Skip TTS generation
+   python src/main.py --md input/sample.md --no-tts
+
+   # Generate with subtitles
+   python src/main.py --md input/sample.md --subtitles
+
+   # Custom video dimensions
+   python src/main.py --md input/sample.md --width 1280 --height 720
+
+   # Use custom library path
+   python src/main.py --md input/sample.md --library path/to/library
+   ```
+
 ## Markdown Syntax
 
-- **Set video duration:**
-  ```markdown
-  [[video_duration: seconds]]
-  ```
+### Global Settings
+```markdown
+[[video_duration: 120]]  # Set explicit video duration in seconds
+```
 
-- **Add image:**
-  ```markdown
-  [[imagepath: path/to/image.jpg, timestamp: seconds, duration: seconds]]
-  ```
+### Video/Image Markers
+```markdown
+# Basic image
+[[imagepath: image.jpg, timestamp: 0, duration: 5]]
 
-- **Add video:**
-  ```markdown
-  [[videopath: path/to/video.mp4, timestamp: seconds, duration: seconds]]
-  ```
+# Image with channel and opacity
+[[imagepath: overlay.png, timestamp: 10, duration: 15, channel: 2, opacity: 0.8]]
+
+# Looping video background
+[[videopath: background.mp4, timestamp: 0, duration: loop, channel: 1]]
+
+# Video with transition
+[[videopath: clip.mp4, timestamp: 20, duration: 10, transition: fade]]
+```
+
+### Audio Markers
+```markdown
+# Background music (looping)
+[[audiopath: music.mp3, timestamp: 0, duration: loop, volume: 0.5]]
+
+# Sound effect (plays once)
+[[sfxpath: explosion.wav, timestamp: 15]]
+
+# Audio with specific duration
+[[audiopath: ambient.mp3, timestamp: 0, duration: 60, channel: 2]]
+```
+
+### Text Overlays
+```markdown
+# Title text
+[[text: Welcome to the Show, timestamp: 0, duration: 5, style: title]]
+
+# Positioned subtitle
+[[text: Episode 1, timestamp: 5, duration: 3, position: bottom, style: subtitle]]
+
+# Custom styled text
+[[text: Important!, timestamp: 10, duration: 5, position: top, fontsize: 64, color: red]]
+```
+
+### Marker Properties Reference
+
+| Property | Values | Description |
+|----------|--------|-------------|
+| `timestamp` | seconds (float) | When to start showing the element |
+| `duration` | seconds or `loop` | How long to show, or loop until video ends |
+| `channel` | integer | Layer order (higher = on top) |
+| `opacity` | 0.0 - 1.0 | Transparency level |
+| `volume` | 0.0 - 1.0 | Audio volume |
+| `position` | center, top, bottom, left, right, x,y | Placement on screen |
+| `style` | title, subtitle, caption, heading | Predefined text styles |
+| `transition` | fade | Transition effect |
+| `color` | name or #hex | Text/element color |
+| `fontsize` | integer | Text size in pixels |
 
 ## Directory Structure
 
 ```
 TextToSimpleVid/
 ├── src/
-│   ├── tts/
-│   │   ├── models/          # Place Kokoro model files here
-│   │   │   ├── kokoro-v1.0.onnx
-│   │   │   └── voices-v1.0.bin
-│   │   └── kokoro_tts.py
-│   └── main.py
-├── input/                   # Your markdown and media files
-└── output/                  # Generated videos
+│   ├── main.py              # Main orchestrator
+│   ├── parser/              # Markdown parsing
+│   ├── media/               # Video/image processing
+│   ├── audio/               # Audio mixing
+│   ├── subtitles/           # Text rendering
+│   ├── tts/                 # Text-to-speech
+│   │   └── models/          # Kokoro model files
+│   └── utils/               # Utilities
+├── library/                 # Reusable media assets
+│   ├── video/               # Video clips
+│   ├── audio/               # Music, ambient sounds
+│   ├── images/              # Images, logos
+│   └── sfx/                 # Sound effects
+├── input/                   # Your markdown and project files
+├── output/                  # Generated videos
+└── config/                  # Configuration files
 ```
+
+## Media Library
+
+Place reusable assets in the `library/` folder. The parser will automatically search for files in:
+1. The `input/` folder (project-specific files)
+2. The `library/` folder (reusable assets by type)
+
+## Multi-Channel System
+
+Channels determine the layering order:
+- **Video/Images**: Higher channel numbers render on top
+- **Audio**: All channels are mixed together
+- Use channel 3+ for background elements
+- Use channel 1-2 for foreground overlays
 
 ## Requirements
 

@@ -64,6 +64,8 @@ def generate_binaural_raw(
         - sr: Sample rate used.
         - channels: Number of channels (always 2).
     """
+    # This function uses integer-cycle snapping to ensure mathematically perfect loops without fading.
+    
     n_samples = int(duration_s * sr)
     t = np.linspace(0, duration_s, n_samples, endpoint=False)
     two_pi = 2 * np.pi
@@ -75,43 +77,69 @@ def generate_binaural_raw(
     freq_mod_depth  = freq_mod_pct  / 100.0
     noise_factor    = noise_pct     / 100.0
 
+    # --- Snapdragon Frequencies for Perfect Looping ---
+    # To prevent phase discontinuities at the loop boundary, we adjusted frequencies 
+    # so they complete exactly an integer number of cycles within duration_s.
+    
+    # 1. Carrier Frequency Snap
+    # Nearest integer cycle count
+    carrier_cycles = round(carrier * duration_s)
+    # Adjust carrier to exact frequency needed
+    carrier_snapped = carrier_cycles / duration_s
+    
+    # 2. Brainwave Frequency Snap (Binaural Beat)
+    # The beat frequency is the difference between L and R. 
+    # We want the beat cycle to also be continuous.
+    brainwave_cycles = round(brainwave * duration_s)
+    brainwave_snapped = brainwave_cycles / duration_s
+    
     # Base frequencies for left and right channels
-    left_freq  = carrier
-    right_freq = carrier + brainwave * binaural_factor
+    left_freq  = carrier_snapped
+    right_freq = carrier_snapped + brainwave_snapped * binaural_factor
 
     # --- Calculate LFO frequencies for a perfect loop ---
     # Frequency modulation: exactly NUM_FM_CYCLES cycle(s) per loop.
     lfo_freq = NUM_FM_CYCLES / duration_s
 
-    # Amplitude modulation: integer number of cycles, aiming for target frequency.
-    num_cycles_am = max(1, round(AMP_MOD_TARGET_FREQ_HZ * duration_s)) # Ensure at least 1 cycle
-    amp_mod_freq = num_cycles_am / duration_s # Exact frequency for integer cycles
+    # Amplitude modulation: integer number of cycles
+    num_cycles_am = max(1, round(AMP_MOD_TARGET_FREQ_HZ * duration_s)) 
+    amp_mod_freq = num_cycles_am / duration_s
 
     # --- Calculate modulation signals ---
-    # Freq LFO: shifts frequency, scaled by FREQ_MOD_MAX_SHIFT_HZ
+    # Frequency LFO
     freq_lfo = np.sin(two_pi * lfo_freq * t) * (FREQ_MOD_MAX_SHIFT_HZ * freq_mod_depth)
-    # Amp LFO: varies amplitude between (1-depth) and (1+depth) -> adjusted to 1.0 +/- depth*sin(...)
-    # Using (1 + sin)/2 shifts range from 0 to 1, scale by depth, offset if needed.
-    # Original formula: 1.0 + amp_mod_depth * np.sin(...) -> range [1-depth, 1+depth]
-    amp_lfo = 1.0 + amp_mod_depth * np.sin(two_pi * amp_mod_freq * t)
+    
+    # Amplitude LFO - "Spatial Tremolo"
+    # User formula: 1.0 +/- depth * sin(...)
+    # Note: This creates a signal that ranges from (1-depth) to (1+depth).
+    # Max amplitude can reach 1.0 + 1.0 = 2.0 if depth is 100%.
+    # We will normalize this later to prevent clipping.
+    am_oscillator = np.sin(two_pi * amp_mod_freq * t)
+    
+    amp_lfo_left = 1.0 + amp_mod_depth * am_oscillator
+    amp_lfo_right = 1.0 - amp_mod_depth * am_oscillator # 180 degree phase shift
 
-
-    # --- Generate the left and right channel waveforms ---
-    # Apply frequency modulation by adding freq_lfo to the instantaneous frequency calculation
-    # Integrate frequency over time for phase: cumsum(freq)/sr can be approximated by (base_freq + freq_lfo) * t
-    # Note: A more precise FM requires integrating the frequency, but this is common approximation.
+    # --- Generate the waves with independent AM ---
+    # Integrate frequency for phase. 
+    # We add freq_lfo (Hz shift) to the base freq.
     left_phase = two_pi * np.cumsum(left_freq + freq_lfo) / sr
     right_phase = two_pi * np.cumsum(right_freq + freq_lfo) / sr
-    # Generate wave using sine of the phase, apply amplitude modulation
-    left_wave  = np.sin(left_phase) * amp_lfo
-    right_wave = np.sin(right_phase) * amp_lfo
-    # # Original simpler FM (less accurate but possibly intended):
-    # left_wave  = np.sin(two_pi * (left_freq + freq_lfo) * t)  * amp_lfo
-    # right_wave = np.sin(two_pi * (right_freq + freq_lfo) * t) * amp_lfo
+    
+    left_wave  = np.sin(left_phase) * amp_lfo_left
+    right_wave = np.sin(right_phase) * amp_lfo_right
 
+    # --- Normalization to prevent Clipping ---
+    # The AM logic can boost signal up to (1 + amp_mod_depth).
+    # We basically divide by the max possible amplitude of the AM stage to keep it <= 1.0
+    # (Before mixing noise/stereo, which are handled by ratios)
+    max_am_boost = 1.0 + amp_mod_depth
+    if max_am_boost > 0:
+        left_wave /= max_am_boost
+        right_wave /= max_am_boost
 
     # --- Add optional noise ---
-    # Generate noise once and apply to both channels if needed
+    # Mix Logic: Signal * (1-N) + Noise * N
+    # This prevents clipping as long as Signal and Noise are both <= 1.0
     if noise_factor > 0:
         noise = (2 * np.random.rand(n_samples) - 1.0) * noise_factor
         left_mix  = left_wave  * (1.0 - noise_factor) + noise
@@ -121,19 +149,26 @@ def generate_binaural_raw(
         right_mix = right_wave
 
     # --- Adjust stereo width ---
-    # If stereo_factor < 1.0, blend towards the center (mono)
+    # Standard stereo width algorithm
     if stereo_factor < 1.0:
+        # Mid/Side processing equivalent
+        # M = (L+R)/2, S = (L-R)/2
+        # New L = M + S*width, New R = M - S*width
+        # Simplified linear blend to mono:
         center = 0.5 * (left_mix + right_mix)
         left_mix  = stereo_factor * left_mix  + (1.0 - stereo_factor) * center
         right_mix = stereo_factor * right_mix + (1.0 - stereo_factor) * center
 
-    # --- Prepare for PCM conversion (No final volume scaling here) ---
-    left_final  = left_mix
-    right_final = right_mix
+    # --- Prepare for PCM conversion ---
+    # Check for NaNs just in case
+    left_mix = np.nan_to_num(left_mix)
+    right_mix = np.nan_to_num(right_mix)
 
-    # Clamp values to prevent clipping before conversion (important!)
-    left_final = np.clip(left_final, -1.0, 1.0)
-    right_final = np.clip(right_final, -1.0, 1.0)
+    # Soft Clip / Limiter (Optional, but hard clip is safer if we normalized correctly)
+    # We normalized AM, and Noise mix preserves limits. 
+    # Just standard clamp.
+    left_final = np.clip(left_mix, -1.0, 1.0)
+    right_final = np.clip(right_mix, -1.0, 1.0)
 
     # Convert to 16-bit PCM
     left_pcm  = (left_final  * 32767).astype(np.int16)
@@ -172,7 +207,9 @@ audio_seg = AudioSegment(
 )
 
 # Apply short fade-in and fade-out AFTER generation for loop smoothing
-audio_seg = audio_seg.fade_in(FADE_MS).fade_out(FADE_MS)
+# With the new frequency snapping logic, the loop is mathematically perfect.
+# We skip fading to prevent volume dips at the loop point.
+# audio_seg = audio_seg.fade_in(FADE_MS).fade_out(FADE_MS)
 
 # Apply Volume *after* caching and fading using pydub's gain adjustment
 # Convert volume percentage (0-100) to dB change.
